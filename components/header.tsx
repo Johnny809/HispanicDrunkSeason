@@ -46,6 +46,7 @@ export function Header() {
             <option value="en">EN</option>
             <option value="es">ES</option>
           </select>
+          <Link href="/login" className="rounded-full border border-slate-300 px-4 py-2 text-xs font-medium text-slate-700 md:text-sm">Log in</Link>
           <Link href="/signup" className="rounded-full bg-ink px-4 py-2 text-xs font-medium text-white md:text-sm">Sign up</Link>
         </div>
       </div>

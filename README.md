@@ -37,6 +37,17 @@ npm install
 - Security: `GET /api/security/status`, `POST /api/security/attack`, `POST /api/security/unlock`
 - Affiliate: `POST /api/affiliate/click`, `GET /api/affiliate/summary`, `POST /api/affiliate/withdraw`
 
+
+## Cloudflare Turnstile configuration
+Set these environment variables (for local dev and production):
+
+```bash
+CF_TURNSTILE_SITE_KEY=0x4AAAAAACb_9_-gQiiJrEcH
+CF_TURNSTILE_SECRET_KEY=0x4AAAAAACb_96mFOBDIVCIxW1GOPUPYE6g
+```
+
+If values are copied with extra wrappers (quotes, angle brackets, or spaces), the app now normalizes them at runtime.
+
 ## Notes
 - Security, affiliate payouts, and notifications run in **demo mode** with in-memory stores.
 - SMS/Email alerts are queued as mock notifications unless you connect providers (Twilio/Resend/etc.).
