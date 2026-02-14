@@ -2,12 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { coupons, hotSales, priceAlerts, recommendations, type Category } from "@/lib/data";
 import { useLanguage } from "@/components/language-provider";
+import type { Category, CouponDeal, Recommendation } from "@/lib/data";
+import type { RecommendationPriority } from "@/lib/demo-engine";
 
-type Priority = "cheapest" | "best-rated" | "fastest-shipping";
+type ScanStats = { scanned: number; coupons: number };
+type HotSale = { title: string; desc: string; image: string };
 
 const categoryCopy: Record<Category, string> = {
   tech: "Phones, accessories, laptops, and smart devices",
@@ -21,41 +23,66 @@ const categoryCopy: Record<Category, string> = {
 export function DemoForm() {
   const [budget, setBudget] = useState(250);
   const [category, setCategory] = useState<Category>("gaming");
-  const [priorities, setPriorities] = useState<Priority[]>(["best-rated"]);
+  const [priorities, setPriorities] = useState<RecommendationPriority[]>(["best-rated"]);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
-  const [scanStats, setScanStats] = useState<{ scanned: number; coupons: number } | null>(null);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [scanStats, setScanStats] = useState<ScanStats | null>(null);
+  const [coupons, setCoupons] = useState<CouponDeal[]>([]);
+  const [hotSales, setHotSales] = useState<HotSale[]>([]);
+  const [priceAlerts, setPriceAlerts] = useState<{ item: string; drop: string; now: string }[]>([]);
+  const [error, setError] = useState("");
   const reduceMotion = useReducedMotion();
   const { t } = useLanguage();
 
-  const filtered = useMemo(() => {
-    let list = recommendations.filter((item) => item.category === category && item.price <= budget + 100);
-    if (priorities.includes("cheapest")) list = [...list].sort((a, b) => a.price - b.price);
-    if (priorities.includes("best-rated")) list = [...list].sort((a, b) => b.rating - a.rating);
-    if (priorities.includes("fastest-shipping")) list = [...list].sort((a, b) => a.shippingDays - b.shippingDays);
-    return list;
-  }, [budget, category, priorities]);
+  useEffect(() => {
+    const bootstrap = async () => {
+      const res = await fetch("/api/demo/bootstrap", { cache: "no-store" });
+      const data = await res.json();
+      setCoupons(data.coupons ?? []);
+      setHotSales(data.hotSales ?? []);
+      setPriceAlerts(data.priceAlerts ?? []);
+    };
 
-  const scopedCoupons = useMemo(() => coupons.filter((coupon) => coupon.category === category), [category]);
+    bootstrap();
+  }, []);
 
-  const togglePriority = (p: Priority) => {
+  const togglePriority = (p: RecommendationPriority) => {
     setPriorities((prev) => (prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p]));
   };
 
   const generate = async () => {
     setLoading(true);
     setGenerated(false);
-    await new Promise((res) => setTimeout(res, 1200));
-    setScanStats({ scanned: 2417 + Math.floor(Math.random() * 1800), coupons: scopedCoupons.length + 12 });
-    setLoading(false);
+    setError("");
+
+    const res = await fetch("/api/demo/recommendations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budget, category, priorities })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      setError(data?.error ?? "Unable to generate recommendations.");
+      setLoading(false);
+      return;
+    }
+
+    setRecommendations(data.items ?? []);
+    setScanStats(data.stats ?? null);
     setGenerated(true);
+    setLoading(false);
   };
+
+  const scopedCoupons = coupons.filter((coupon) => coupon.category === category);
 
   return (
     <section className="section-shell py-12 md:py-16">
-      <div className="mb-7 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 text-sm text-slate-700">
-        <p className="font-medium text-ink">Organized search sections + global radius simulation</p>
-        <p className="mt-1">The AI scans thousands of stores (simulated) and prioritizes affiliate-safe offers with shipping and stock data.</p>
+      <div className="mb-8 rounded-2xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-violet-50 p-4 text-sm text-slate-700">
+        <p className="font-medium text-ink">Backended scanner</p>
+        <p className="mt-1">Recommendations, hot sales, and coupons now load through server APIs for cleaner data flow.</p>
       </div>
 
       <div className="mb-8">
@@ -78,20 +105,9 @@ export function DemoForm() {
       <div className="grid gap-8 lg:grid-cols-[1.25fr,0.75fr]">
         <div className="glass-card p-5 md:p-7">
           <h1 className="text-3xl font-semibold text-ink">{t("demoTitle")}</h1>
-          <p className="mt-2 text-sm text-slate-600">Choose a category like Gaming or Furniture to avoid mixed product types in one search.</p>
+          <p className="mt-2 text-sm text-slate-600">Choose one section to keep results organized.</p>
 
-          <div className="mt-8 space-y-6">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Popular sections</p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {(["gaming", "furniture", "tech", "fashion", "home", "beauty"] as Category[]).map((item) => (
-                  <button key={item} type="button" onClick={() => setCategory(item)} className={`rounded-full border px-3 py-1.5 text-xs capitalize ${category === item ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-600"}`}>
-                    {item}
-                  </button>
-                ))}
-              </div>
-            </div>
-
+          <div className="mt-6 space-y-5">
             <label className="block">
               <span className="text-sm font-medium text-slate-700">Budget: ${budget}</span>
               <input type="range" min={30} max={600} value={budget} onChange={(e) => setBudget(Number(e.target.value))} className="mt-3 w-full" />
@@ -112,38 +128,48 @@ export function DemoForm() {
 
             <div>
               <p className="text-sm font-medium text-slate-700">I care about</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {[["cheapest", "Cheapest"], ["best-rated", "Best-rated"], ["fastest-shipping", "Fastest shipping"]].map(([value, label]) => (
-                  <button type="button" key={value} onClick={() => togglePriority(value as Priority)} className={`rounded-full border px-4 py-2 text-sm ${priorities.includes(value as Priority) ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-600"}`}>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {([
+                  ["cheapest", "Cheapest"],
+                  ["best-rated", "Best rated"],
+                  ["fastest-shipping", "Fastest shipping"]
+                ] as [RecommendationPriority, string][]).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => togglePriority(value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs ${priorities.includes(value) ? "border-indigo-500 bg-indigo-50 text-indigo-700" : "border-slate-300 text-slate-600"}`}
+                  >
                     {label}
                   </button>
                 ))}
               </div>
             </div>
 
-            <button onClick={generate} className="rounded-full bg-ink px-6 py-3 text-sm font-medium text-white">Generate recommendations</button>
+            <button onClick={generate} disabled={loading} className="rounded-full bg-ink px-5 py-2 text-sm font-medium text-white disabled:opacity-60">
+              {loading ? "AI is scanning stores..." : "Generate recommendations"}
+            </button>
+            {error && <p className="text-sm text-rose-600">{error}</p>}
           </div>
 
-          {loading && <p className="mt-6 text-sm text-indigo-700">AI is scanning stores…</p>}
-          {scanStats && <p className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-700">Scanned {scanStats.scanned.toLocaleString()} stores and found {scanStats.coupons} matching coupon opportunities.</p>}
-
           {generated && (
-            <div className="mt-7 grid gap-4 md:grid-cols-2">
-              {filtered.map((item, idx) => (
-                <motion.article key={item.id} initial={reduceMotion ? false : { opacity: 0, y: 12 }} animate={reduceMotion ? undefined : { opacity: 1, y: 0 }} transition={{ duration: 0.25, delay: idx * 0.06 }} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                  <div className="relative h-32 w-full">
+            <div className="mt-8 grid gap-4 md:grid-cols-2">
+              {recommendations.map((item, index) => (
+                <motion.article
+                  key={item.id}
+                  initial={reduceMotion ? false : { opacity: 0, y: 18 }}
+                  animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+                  transition={{ duration: 0.3, delay: index * 0.05 }}
+                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
+                >
+                  <div className="relative h-36 w-full">
                     <Image src={item.image} alt={item.name} fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
                   </div>
                   <div className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="font-medium text-ink">{item.name}</p>
-                      <span className="rounded-full bg-indigo-100 px-3 py-1 text-xs text-indigo-700">Deal score {item.score}</span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-700">${item.price} <span className="text-xs text-slate-500 line-through">${item.originalPrice}</span> · {item.discountPercent}% off</p>
-                    <p className="mt-1 text-xs text-slate-600">{item.store} · {item.distanceMiles} miles · {item.offersShipping ? `Ships in ${item.shippingDays}d` : "No shipping"}</p>
-                    <p className="mt-1 text-xs text-slate-600">Stock: {item.stock} units</p>
-                    <p className="mt-2 text-sm text-slate-500">Why this pick: {item.why}</p>
-                    <Link href={`/product/${item.id}`} className="mt-3 inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-medium text-indigo-700">Open listing</Link>
+                    <p className="font-medium text-ink">{item.name}</p>
+                    <p className="mt-1 text-sm text-slate-600">${item.price} · {item.discountPercent}% off · Stock {item.stock}</p>
+                    <p className="mt-1 text-xs text-slate-500">{item.store} · {item.distanceMiles} miles · {item.offersShipping ? `${item.shippingDays} day shipping` : "No shipping"}</p>
+                    <Link href={`/product/${item.id}`} className="mt-3 inline-block text-xs font-medium text-indigo-700">Open listing</Link>
                   </div>
                 </motion.article>
               ))}
@@ -151,32 +177,32 @@ export function DemoForm() {
           )}
         </div>
 
-        <aside className="space-y-6">
-          <div className="glass-card p-6">
-            <h2 className="font-semibold text-ink">Coupons scanner</h2>
-            <p className="mt-1 text-xs text-slate-600">Affiliate-compatible coupon picks for the selected category.</p>
-            <div className="mt-4 space-y-3">
-              {scopedCoupons.map((coupon) => (
-                <div key={coupon.id} className="rounded-xl border border-slate-200 p-3 text-xs">
-                  <p className="font-medium text-slate-800">{coupon.store} · {coupon.savingsText}</p>
-                  <p className="mt-1 text-indigo-700">Code: <span className="font-semibold">{coupon.code}</span> · Expires in {coupon.expiresInHours}h</p>
-                </div>
+        <aside className="space-y-4">
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-semibold text-ink">Price Drop Alerts</h3>
+            <div className="mt-3 space-y-2">
+              {priceAlerts.map((alert) => (
+                <p key={alert.item} className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">{alert.item} {alert.drop} · now {alert.now}</p>
               ))}
             </div>
-            <Link href="/coupons" className="mt-3 inline-flex rounded-full border border-slate-300 px-3 py-1.5 text-xs text-slate-700">View all coupons</Link>
           </div>
 
-          <div className="glass-card p-6">
-            <h2 className="font-semibold text-ink">Price Drop Alerts</h2>
-            <div className="mt-4 space-y-3">
-              {priceAlerts.map((alert) => (
-                <div key={alert.item} className="rounded-xl border border-slate-200 p-3">
-                  <p className="text-sm font-medium text-slate-800">{alert.item}</p>
-                  <p className="text-xs text-emerald-700">{alert.drop} · Now {alert.now}</p>
-                </div>
+          <div className="glass-card p-5">
+            <h3 className="text-sm font-semibold text-ink">Coupons in this section</h3>
+            <div className="mt-3 space-y-2">
+              {scopedCoupons.map((coupon) => (
+                <p key={coupon.id} className="rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-700">{coupon.store} · {coupon.code} · {coupon.savingsText}</p>
               ))}
+              {scopedCoupons.length === 0 && <p className="text-xs text-slate-500">No active coupons for this section yet.</p>}
             </div>
           </div>
+
+          {scanStats && (
+            <div className="glass-card p-5 text-xs text-slate-700">
+              <p>Scanned sites: <span className="font-semibold text-ink">{scanStats.scanned}</span></p>
+              <p className="mt-2">Coupon matches: <span className="font-semibold text-ink">{scanStats.coupons}</span></p>
+            </div>
+          )}
         </aside>
       </div>
     </section>

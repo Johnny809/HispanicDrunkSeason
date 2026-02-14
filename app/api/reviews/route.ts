@@ -1,8 +1,25 @@
 import { NextResponse } from "next/server";
 import { addReview, listReviews } from "@/lib/review-store";
 
-export async function GET() {
-  return NextResponse.json({ reviews: listReviews() });
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const page = Math.max(1, Number(searchParams.get("page") ?? 1));
+  const pageSize = Math.max(1, Math.min(50, Number(searchParams.get("pageSize") ?? 12)));
+
+  const all = listReviews();
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize;
+  const reviews = all.slice(start, end);
+
+  return NextResponse.json({
+    reviews,
+    pagination: {
+      page,
+      pageSize,
+      total: all.length,
+      hasMore: end < all.length
+    }
+  });
 }
 
 export async function POST(request: Request) {

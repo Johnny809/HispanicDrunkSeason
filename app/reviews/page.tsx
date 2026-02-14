@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 type Review = {
   id: string;
@@ -11,45 +11,28 @@ type Review = {
   createdAt: string;
 };
 
-const fillerComments = [
-  "Found an in-stock gaming deal faster than 3 other apps.",
-  "Category filters keep furniture and tech from mixing.",
-  "Coupon center gave me an extra stackable code.",
-  "Affiliate listing page was clear and mobile friendly."
-];
-
 export default function ReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [username, setUsername] = useState("");
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState("");
   const [purchaseConfirmed, setPurchaseConfirmed] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const load = async () => {
-    const res = await fetch("/api/reviews");
+  const load = async (nextPage: number, append = false) => {
+    const res = await fetch(`/api/reviews?page=${nextPage}&pageSize=12`, { cache: "no-store" });
     const data = await res.json();
-    setReviews(data.reviews ?? []);
+
+    const list = data.reviews ?? [];
+    setReviews((prev) => (append ? [...prev, ...list] : list));
+    setHasMore(Boolean(data?.pagination?.hasMore));
+    setPage(nextPage);
   };
 
   useEffect(() => {
-    load();
+    load(1, false);
   }, []);
-
-  const feed = useMemo(() => {
-    if (reviews.length === 0) return [];
-    const endless = Array.from({ length: 80 }, (_, i) => {
-      const base = reviews[i % reviews.length];
-      if (i < reviews.length) return base;
-      return {
-        ...base,
-        id: `${base.id}_clone_${i}`,
-        comment: fillerComments[i % fillerComments.length],
-        createdAt: new Date(Date.now() - i * 3600_000).toISOString()
-      };
-    });
-    return endless;
-  }, [reviews]);
 
   const submit = async () => {
     const res = await fetch("/api/reviews", {
@@ -57,16 +40,17 @@ export default function ReviewsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, rating, comment, purchaseConfirmed })
     });
+
     if (res.ok) {
       setComment("");
-      load();
+      await load(1, false);
     }
   };
 
   return (
     <section className="section-shell py-16">
       <h1 className="text-4xl font-semibold text-ink">Reviews</h1>
-      <p className="mt-2 text-slate-600">Share your experience and browse a continuous stream of community feedback.</p>
+      <p className="mt-2 text-slate-600">Post reviews and browse feedback loaded from backend pagination.</p>
 
       <div className="mt-6 glass-card p-5">
         <div className="grid gap-3 md:grid-cols-2">
@@ -79,7 +63,7 @@ export default function ReviewsPage() {
       </div>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
-        {feed.slice(0, visibleCount).map((review) => (
+        {reviews.map((review) => (
           <article key={review.id} className="glass-card p-5">
             <div className="flex items-center justify-between">
               <p className="font-semibold text-ink">@{review.username}</p>
@@ -94,8 +78,8 @@ export default function ReviewsPage() {
         ))}
       </div>
 
-      {visibleCount < feed.length && (
-        <button onClick={() => setVisibleCount((prev) => prev + 12)} className="mt-6 rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-700">
+      {hasMore && (
+        <button onClick={() => load(page + 1, true)} className="mt-6 rounded-full border border-slate-300 px-4 py-2 text-sm text-slate-700">
           Load more reviews
         </button>
       )}

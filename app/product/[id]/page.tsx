@@ -3,20 +3,35 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useMemo, useState } from "react";
-import { getRecommendationById, getRelatedRecommendations } from "@/lib/data";
+import { useEffect, useState } from "react";
+import type { Recommendation } from "@/lib/data";
 
 export default function ProductDetailPage() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
-  const product = Number.isFinite(id) ? getRecommendationById(id) : undefined;
+  const [product, setProduct] = useState<Recommendation | null>(null);
+  const [related, setRelated] = useState<Recommendation[]>([]);
   const [notice, setNotice] = useState("");
   const [visibleRelated, setVisibleRelated] = useState(4);
 
-  const related = useMemo(() => {
-    if (!product) return [];
-    return getRelatedRecommendations(product.category, product.id);
-  }, [product]);
+  useEffect(() => {
+    const load = async () => {
+      const productRes = await fetch(`/api/products/${id}`, { cache: "no-store" });
+      const productData = await productRes.json();
+      if (!productRes.ok) {
+        setProduct(null);
+        return;
+      }
+
+      setProduct(productData.product);
+
+      const relatedRes = await fetch(`/api/products/${id}/related?limit=24`, { cache: "no-store" });
+      const relatedData = await relatedRes.json();
+      setRelated(relatedData.related ?? []);
+    };
+
+    if (Number.isFinite(id)) load();
+  }, [id]);
 
   if (!product) return <section className="section-shell py-16"><p className="text-slate-600">Product not found.</p></section>;
 
@@ -28,7 +43,7 @@ export default function ProductDetailPage() {
     });
     const data = await res.json();
     if (!res.ok) return setNotice(data?.error ?? "Unable to generate affiliate link.");
-    setNotice(`Affiliate secured (${(product.discountPercent)}% off). Redirecting to ${product.store}...`);
+    setNotice(`Affiliate secured (${product.discountPercent}% off). Redirecting to ${product.store}...`);
     window.open(data.affiliateUrl, "_blank", "noopener,noreferrer");
   };
 
@@ -55,7 +70,6 @@ export default function ProductDetailPage() {
 
           <button onClick={buyNow} className="mt-6 rounded-full bg-ink px-6 py-3 text-sm font-medium text-white">Buy with affiliate</button>
           {notice && <p className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-xs text-indigo-700">{notice}</p>}
-          <p className="mt-4 text-xs text-slate-500">When you press Buy, DealVista creates and appends affiliate tracking to the outbound store URL.</p>
         </div>
       </div>
 

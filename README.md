@@ -16,7 +16,7 @@ npm install
 ## Pages
 - `/` intro page (welcome + entry)
 - `/home` main marketing page
-- `/demo` AI shopping demo (category-organized listings, coupons, stock, shipping, distance)
+- `/demo` AI shopping demo (now powered by backend recommendation APIs)
 - `/product/:id` product listing detail page with affiliate buy flow
 - `/coupons` coupon center
 - `/pricing` dynamic pricing (admin discounts reflected live)
@@ -30,6 +30,8 @@ npm install
 - `/employee` employee queue panel
 
 ## Demo APIs
+- Demo backend: `GET /api/demo/bootstrap`, `POST /api/demo/recommendations`
+- Products backend: `GET /api/products/:id`, `GET /api/products/:id/related`
 - Reviews: `GET/POST /api/reviews`
 - Signup: `POST /api/signup`
 - Discounts: `GET/POST /api/subscriptions/discount`
