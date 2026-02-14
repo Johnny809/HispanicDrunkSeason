@@ -35,24 +35,12 @@ function totp(secret: string, step = 30) {
   return String(code).padStart(6, "0");
 }
 
-function getOtpAuthUri() {
-  const issuer = encodeURIComponent("DealVista Security");
-  const account = encodeURIComponent("owner@dealvista.app");
-  const secret = Buffer.from(state.otpSecret).toString("base64").replace(/=/g, "");
-  return `otpauth://totp/${issuer}:${account}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=6&period=30`;
-}
-
 export function getSecurityStatus() {
   return {
     locked: state.locked,
     attackDetectedAt: state.attackDetectedAt,
     ownerEmail: state.ownerEmail,
-    incidentLog: state.incidentLog,
-    totpCodePreview: totp(state.otpSecret),
-    authenticatorKey: Buffer.from(state.otpSecret).toString("base64").replace(/=/g, ""),
-    otpAuthUri: getOtpAuthUri(),
-    unlockToken: state.unlockToken,
-    authenticatorHint: "Use the key/URI in Google Authenticator."
+    incidentLog: state.incidentLog
   };
 }
 
@@ -76,7 +64,7 @@ export function triggerAttack() {
 }
 
 export function unlockWithCode(code: string, token?: string) {
-  const valid = code === totp(state.otpSecret) && (!!token ? token === state.unlockToken : true);
+  const valid = code === totp(state.otpSecret) && Boolean(token) && token === state.unlockToken;
   if (!valid) return { ok: false };
 
   state.locked = false;

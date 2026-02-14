@@ -35,7 +35,7 @@ export default function AdminPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   type AffiliateSummary = { clicks: number; totalRevenue: number; availableBalance: number; withdrawnTotal: number };
 
-type SecurityStatus = { locked: boolean; totpCodePreview: string; incidentLog: string[]; authenticatorKey: string; unlockToken: string; otpAuthUri: string };
+type SecurityStatus = { locked: boolean; incidentLog: string[]; ownerEmail: string; attackDetectedAt?: string };
 
 const [affiliateSummary, setAffiliateSummary] = useState<AffiliateSummary | null>(null);
   const [affiliateTransactions, setAffiliateTransactions] = useState<AffiliateTransaction[]>([]);
@@ -43,6 +43,7 @@ const [affiliateSummary, setAffiliateSummary] = useState<AffiliateSummary | null
   const [discounts, setDiscounts] = useState({ proPercentOff: 0, premiumPercentOff: 0 });
   const [security, setSecurity] = useState<SecurityStatus | null>(null);
   const [unlockCode, setUnlockCode] = useState("");
+  const [unlockToken, setUnlockToken] = useState("");
   const [notice, setNotice] = useState<string>("");
 
   const load = async () => {
@@ -108,7 +109,7 @@ const [affiliateSummary, setAffiliateSummary] = useState<AffiliateSummary | null
     const res = await fetch("/api/security/unlock", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: unlockCode, token: security?.unlockToken })
+      body: JSON.stringify({ code: unlockCode, token: unlockToken })
     });
     const data = await res.json();
     setNotice(res.ok ? "Site unlocked. Recovery notifications queued." : (data.error ?? "Invalid code"));
@@ -154,14 +155,14 @@ const [affiliateSummary, setAffiliateSummary] = useState<AffiliateSummary | null
 
         <div className="glass-card p-5">
           <h2 className="text-lg font-semibold text-ink">Security AI center</h2>
-          <p className="mt-1 text-xs text-slate-500">Google Authenticator code preview: <span className="font-semibold">{security?.totpCodePreview ?? "------"}</span></p>
-          <p className="mt-1 break-all text-xs text-slate-500">Authenticator key: <span className="font-semibold">{security?.authenticatorKey ?? "n/a"}</span></p>
-          <p className="mt-1 break-all text-xs text-slate-500">Unlock token: <span className="font-semibold">{security?.unlockToken ?? "n/a"}</span></p>
           <p className="mt-1 text-xs text-slate-500">Status: {security?.locked ? "Locked" : "Online"}</p>
+          <p className="mt-1 text-xs text-slate-500">Owner contact: {security?.ownerEmail ?? "hidden"}</p>
+          <p className="mt-1 text-xs text-slate-500">Use the owner SMS link token + authenticator code to unlock.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button onClick={triggerAttack} className="rounded-full bg-rose-600 px-4 py-2 text-xs text-white">Simulate attack + lock site</button>
             <input value={unlockCode} onChange={(e) => setUnlockCode(e.target.value)} placeholder="Enter 2FA code" className="rounded-xl border border-slate-300 px-3 py-2 text-xs" />
-            <button onClick={unlockSite} className="rounded-full bg-emerald-600 px-4 py-2 text-xs text-white">Unlock with code</button>
+            <input value={unlockToken} onChange={(e) => setUnlockToken(e.target.value)} placeholder="Enter unlock token" className="rounded-xl border border-slate-300 px-3 py-2 text-xs" />
+            <button onClick={unlockSite} className="rounded-full bg-emerald-600 px-4 py-2 text-xs text-white">Unlock with code + token</button>
           </div>
         </div>
       </div>
